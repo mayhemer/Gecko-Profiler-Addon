@@ -208,13 +208,14 @@ function findSymbolsToResolveJSON(reporter, profile, sharedLibraries) {
           var subProfile = JSON.parse(profile.threads[i]);
           profile.threads[i] = subProfile;
           // If we parse the samples this may be a subprocess profile we need to merge in
+          var deltaTime = 0;
+          if (profile.meta.startTime && subProfile.meta.startTime) {
+            deltaTime = subProfile.meta.startTime - profile.meta.startTime;
+          }
+
           if (profile.threads[i].threads != null) {
             profile.threads[i] = profile.threads[i].threads[0];
             thread = profile.threads[i];
-            var deltaTime = 0;
-            if (profile.meta.startTime && subProfile.meta.startTime) {
-              deltaTime = subProfile.meta.startTime - profile.meta.startTime;
-            }
             for (sampleId in profile.threads[i].samples) {
               var sample = profile.threads[i].samples[sampleId];
               if (sample.time) {
@@ -244,6 +245,24 @@ function findSymbolsToResolveJSON(reporter, profile, sharedLibraries) {
               lib.end += prefix * parseInt("0x1000000000000", 16);
               sharedLibraries.push(lib);
               sortSharedLibraries(sharedLibraries);
+            }
+          }
+          if (subProfile.backtrack) {
+            if (!profile.backtrack) { // ??? really needed?
+              profile.backtrack = {
+                threads: {},
+                sampler_reference: []
+              };
+            }
+            for (thread_id in subProfile.backtrack.threads) {
+              var thread = subProfile.backtrack.threads[thread_id];
+              for (var marker of thread.markers) {
+                marker.time += deltaTime;
+              }
+              profile.backtrack.threads[thread_id] = thread;
+            }
+            for (sampler_ref of subProfile.backtrack.sampler_reference) {
+              profile.backtrack.sampler_reference.push(sampler_ref);
             }
           }
         }
